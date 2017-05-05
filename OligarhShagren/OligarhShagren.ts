@@ -21,6 +21,7 @@ function log(msg: string, ...args: any[]) {
 
 interface IShopData {
     cityName: string;
+    innovations: string[];
     place: string;
     celebrity: number;
     visitors: string;
@@ -81,7 +82,7 @@ async function run_async() {
     let $tbl = oneOrError($(document), "table.list");
     drawNumbers($tbl);
 
-    let $updateBtn = $("<input type='button' value='обновить'>");
+    let $updateBtn = $("<input id='update' type='button' value='обновить'>");
     $tbl.before($updateBtn);
     $updateBtn.on("click.OLLA", async function (event) {
         try {
@@ -98,6 +99,14 @@ async function run_async() {
         }
     });
 
+    let $exportBtn = $("<input id='export' type='button' value='экспорт'>");
+    $exportBtn.insertAfter($updateBtn);
+    $exportBtn.on("click.OLLA", event => {
+        let $div = $("<div></div>");
+        exportInfo($div);
+        $tbl.before($div);
+    });
+
     // выводит собственно данные
     function drawNumbers($tbl: JQuery) {
 
@@ -105,7 +114,7 @@ async function run_async() {
         if (isEmpty(storedInfo))
             return;
 
-        let prepared = prepareInfo(storedInfo);
+        let prepared = prepareInfo(storedInfo, dateToShort(CurrentGameDate));
         if (prepared == null)
             return;
 
@@ -126,11 +135,11 @@ async function run_async() {
  * для каждого игрока в хранилище готовит данные вида pid = [sold, totalsold] на сегодняшнюю дату
  * @param storedInfo
  */
-function prepareInfo(storedInfo: IDictionary<IStoreItem>): IDictionaryN<[number, number]> | null {
+function prepareInfo(storedInfo: IDictionary<IStoreItem>, dateKey: string): IDictionaryN<[number, number]> | null {
 
     // если данных на сегодня нет, то как бы возвращаем нулл
-    let todayKey = dateToShort(CurrentGameDate);
-    if (storedInfo[todayKey] == null)
+    //let todayKey = dateToShort(CurrentGameDate);
+    if (storedInfo[dateKey] == null)
         return null;
        
 
@@ -286,6 +295,70 @@ function loadInfo(): IDictionary<IStoreItem> {
     return storedInfo;
 }
 
+function exportInfo($place: JQuery) {
+    if ($place.length <= 0)
+        return false;
+
+    if ($place.find("#txtExport").length > 0) {
+        $place.find("#txtExport").remove();
+        return false;
+    }
+
+    let $txt = $('<textarea id="txtExport" style="display:block;width: 800px; height: 200px"></textarea>');
+
+    let storedInfo = loadInfo();
+    let datesStr = Object.keys(storedInfo);
+    datesStr.sort((a, b) => {
+        let adate = dateFromShort(a);
+        let bdate = dateFromShort(b);
+
+        if (a > b)
+            return 1;
+
+        if (a < b)
+            return -1;
+
+        return 0;
+    });
+
+    let exportStr = "pname;city;date;subid;shopname;place;innovations;celebr;visitors;service;sold;index;locP;locQ;P;Q;B" + "\n";
+
+    // начинаем идти с начала к концу по датам
+    for (let dateKey of datesStr) {
+        let info = storedInfo[dateKey];
+
+        // на заданную дату делаем расчет кол-ва проданного и всего проданного
+        let prepared = nullCheck(prepareInfo(storedInfo, dateKey));
+
+        for (let pid in info.players) {
+            let player = info.players[pid];
+            let report = info.retailReport;
+            let shop = player.shopData;
+            if (shop == null)
+                throw new Error(`нет данных по магазину для pid:${pid}, date:${dateKey}`);
+
+            // pname, city, datestr, subid. shopname, place, innovations
+            let pstr = formatStr("{0};{1};{2};{3};{4};{5};{6};", player.pname, shop.cityName, dateKey, player.shopid, player.shopname, shop.place, shop.innovations.join("|"));
+
+            // celebr, visitors, service, sold index
+            let [sold, total] = nullCheck(prepared[pid]);
+            pstr += formatStr("{0};{1};{2};{3};{4};", shop.celebrity, shop.visitors, shop.service, sold, MarketIndex[report.index]);
+
+            // locP, locQ, P, Q, B
+            let loc = report.locals;
+            pstr += formatStr("{0};{1};{2};{3};{4}", loc.price, loc.quality, shop.shagreenProp.price, shop.shagreenProp.quality, shop.shagreenProp.brand);
+
+
+            exportStr += pstr + "\n";
+        }
+    }
+
+
+    $txt.text(exportStr);
+    $place.append($txt);
+    return true;
+}
+
 /**
  * розничный отчет по шагрени
  * @param cityName
@@ -329,6 +402,24 @@ async function getShopData_async(subid: number): Promise<IShopData> {
             let $html = $(html);
 
             try {
+
+                // инновации
+                let innov: string[] = [];
+                let $slots = $html.find("div.artf_slots");
+                if ($slots.length > 0) {
+                    $slots.find("img").each((i, el) => {
+                        let $img = $(el);
+
+                        // обычно выглядит так: Маркетинг / Автомобильная парковка
+                        let title = $img.attr("title");
+                        let items = title.split("/");
+                        let name = nullCheck(items[items.length - 1]).trim();
+
+                        innov.push(name);
+                    });
+                }
+
+
                 // таблица с данными по товарам
                 let $tbl = oneOrError($html, "table.grid");
                 let $infoBlock = oneOrError($html, "table.infoblock tbody");
@@ -368,6 +459,7 @@ async function getShopData_async(subid: number): Promise<IShopData> {
                 let price = str.indexOf("не изв") < 0 ? numberfyOrError(str) : 0;
 
                 return {
+                    innovations: innov,
                     cityName: cityName,
                     place: place,
                     celebrity: celebr,
@@ -392,6 +484,22 @@ async function getMyShopData_async(subid: number): Promise<IShopData> {
     let main = parseUnitMainNew(mainHtml, url);
     let shop = main as any as IMainShop;
 
+    // собираем инновации
+    let innov: string[] = [];
+    let $slots = $(mainHtml).find("div.artf_slots");
+    if ($slots.length > 0) {
+        $slots.find("img[title*='/']").each((i, el) => {
+            let $img = $(el);
+
+            // обычно выглядит так: Маркетинг / Автомобильная парковка
+            let title = $img.attr("title");
+            let items = title.split("/");
+            let name = nullCheck(items[items.length - 1]).trim();
+
+            innov.push(name);
+        });
+    }
+
     // трейдхолл
     url = `/${Realm}/main/unit/view/${subid}/trading_hall`;
     let hallHtml = await tryGet_async(url);
@@ -414,6 +522,7 @@ async function getMyShopData_async(subid: number): Promise<IShopData> {
     let ads = parseAds(adsHtml, url);
 
     return {
+        innovations: innov,
         cityName: main.city,
         place: shop.place,
         service: ServiceLevels[shop.service],
