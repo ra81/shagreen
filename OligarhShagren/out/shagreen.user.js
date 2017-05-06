@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 // @name          Конкурс Олигархов. Шагрень.
 // @namespace     virtonomica
 // @description   Для конкурса шагрени считает общее число проданной шагрени по каждому участнику
-// @version       1.2
+// @version       1.3
 // @include       https://virtonomic*.**/*/main/olla/*
 // @require       https://code.jquery.com/jquery-1.11.1.min.js
 // ==/UserScript==
@@ -3867,10 +3867,10 @@ function run_async() {
  * для каждого игрока в хранилище готовит данные вида pid = [sold, totalsold] на сегодняшнюю дату
  * @param storedInfo
  */
-function prepareInfo(storedInfo, dateKey) {
+function prepareInfo(storedInfo, toDate) {
     // если данных на сегодня нет, то как бы возвращаем нулл
     //let todayKey = dateToShort(CurrentGameDate);
-    if (storedInfo[dateKey] == null)
+    if (storedInfo[toDate] == null)
         return null;
     let datesStr = Object.keys(storedInfo);
     datesStr.sort((a, b) => {
@@ -3901,6 +3901,8 @@ function prepareInfo(storedInfo, dateKey) {
             total += sold;
             dict[pid] = [total, player.totalSum, sold];
         }
+        if (dateKey === toDate)
+            break;
     }
     // подготовим результат. нужно для pid = продано сегодня, всего
     let resDict = {};

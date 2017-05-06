@@ -135,11 +135,11 @@ async function run_async() {
  * для каждого игрока в хранилище готовит данные вида pid = [sold, totalsold] на сегодняшнюю дату
  * @param storedInfo
  */
-function prepareInfo(storedInfo: IDictionary<IStoreItem>, dateKey: string): IDictionaryN<[number, number]> | null {
+function prepareInfo(storedInfo: IDictionary<IStoreItem>, toDate: string): IDictionaryN<[number, number]> | null {
 
     // если данных на сегодня нет, то как бы возвращаем нулл
     //let todayKey = dateToShort(CurrentGameDate);
-    if (storedInfo[dateKey] == null)
+    if (storedInfo[toDate] == null)
         return null;
        
 
@@ -182,6 +182,9 @@ function prepareInfo(storedInfo: IDictionary<IStoreItem>, dateKey: string): IDic
 
             dict[pid] = [total, player.totalSum, sold];
         }
+
+        if (dateKey === toDate)
+            break;
     }
 
     // подготовим результат. нужно для pid = продано сегодня, всего
