@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 // @name          Конкурс Олигархов. Шагрень.
 // @namespace     virtonomica
 // @description   Для конкурса шагрени считает общее число проданной шагрени по каждому участнику
-// @version       1.3
+// @version       1.4
 // @include       https://virtonomic*.**/*/main/olla/*
 // @require       https://code.jquery.com/jquery-1.11.1.min.js
 // ==/UserScript==
@@ -3876,9 +3876,9 @@ function prepareInfo(storedInfo, toDate) {
     datesStr.sort((a, b) => {
         let adate = dateFromShort(a);
         let bdate = dateFromShort(b);
-        if (a > b)
+        if (adate > bdate)
             return 1;
-        if (a < b)
+        if (adate < bdate)
             return -1;
         return 0;
     });
@@ -4006,9 +4006,9 @@ function exportInfo($place) {
     datesStr.sort((a, b) => {
         let adate = dateFromShort(a);
         let bdate = dateFromShort(b);
-        if (a > b)
+        if (adate > bdate)
             return 1;
-        if (a < b)
+        if (adate < bdate)
             return -1;
         return 0;
     });

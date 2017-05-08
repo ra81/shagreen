@@ -148,10 +148,10 @@ function prepareInfo(storedInfo: IDictionary<IStoreItem>, toDate: string): IDict
         let adate = dateFromShort(a);
         let bdate = dateFromShort(b);
 
-        if (a > b)
+        if (adate > bdate)
             return 1;
 
-        if (a < b)
+        if (adate < bdate)
             return -1;
 
         return 0;
@@ -315,10 +315,10 @@ function exportInfo($place: JQuery) {
         let adate = dateFromShort(a);
         let bdate = dateFromShort(b);
 
-        if (a > b)
+        if (adate > bdate)
             return 1;
 
-        if (a < b)
+        if (adate < bdate)
             return -1;
 
         return 0;
