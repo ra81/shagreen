@@ -172,13 +172,20 @@ function prepareInfo(storedInfo: IDictionary<IStoreItem>, toDate: string): IDict
 
             let [total, lastSum, sold] = dict[pid];
 
-            // сколько шагрени продали за день Х. Просто берем выручку за предыдущий период, вычитаем текущую и находим 
-            sold = (player.totalSum - lastSum) / nullCheck(player.shopData).shagreenProp.price;
-            if (sold < 0)
-                throw new Error(`получили отрицательные продажи шагрени для date:${dateKey}, pid: ${pid}, subid: ${player.shopid}`);
+            // если за этот день нет данных для магазина, например магазина не стало
+            if (player.shopData != null) {
+                // сколько шагрени продали за день Х. Просто берем выручку за предыдущий период, вычитаем текущую и находим 
+                sold = (player.totalSum - lastSum) / player.shopData.shagreenProp.price;
+                if (sold < 0)
+                    throw new Error(`получили отрицательные продажи шагрени для date:${dateKey}, pid: ${pid}, subid: ${player.shopid}`);
 
-            sold = Math.round(sold);
-            total += sold;
+                sold = Math.round(sold);
+                total += sold;
+            }
+            else {
+                sold = 0;
+            }
+
 
             dict[pid] = [total, player.totalSum, sold];
         }
@@ -214,7 +221,7 @@ async function doUpdate_async(dashDict: IDictionaryN<ITodayDash>) {
         info.shopData = shop;
 
         // это на будущее, чтобы запросить отчет по шагрени
-        if (cityName == "")
+        if (cityName == "" && shop != null)
             cityName = shop.cityName;
     }
     log("полный дашборд ", dashDict);
@@ -337,8 +344,10 @@ function exportInfo($place: JQuery) {
             let player = info.players[pid];
             let report = info.retailReport;
             let shop = player.shopData;
-            if (shop == null)
-                throw new Error(`нет данных по магазину для pid:${pid}, date:${dateKey}`);
+            if (shop == null) {
+                log(`нет данных по магазину для pid:${pid}, date:${dateKey}`);
+                continue;
+            }
 
             // pname, city, datestr, subid. shopname, place, innovations
             let pstr = formatStr("{0};{1};{2};{3};{4};{5};{6};", player.pname, shop.cityName, dateKey, player.shopid, player.shopname, shop.place, shop.innovations.join("|"));
@@ -393,13 +402,25 @@ async function getShagreenReport_async(cityName: string): Promise<ICityRetailRep
  * по указанным субайди собирает данные по чужим магазинам
  * @param subids
  */
-async function getShopData_async(subid: number): Promise<IShopData> {
+async function getShopData_async(subid: number): Promise<IShopData|null> {
 
-        let url = `/${Realm}/main/unit/view/${subid}`;
-        let html = await tryGet_async(url);
-        let data = parseShopMain(html, url);
+    let url = `/${Realm}/main/unit/view/${subid}`;
+    let html:any;
+    try {
+        html = await tryGet_async(url);
+    }
+    catch (err) {
+        log("", err);
 
-        return data;
+        // если магазин вдруг удалили
+        if (err["status"] = 404)
+            return null;
+
+        throw err;
+    }
+    
+    let data = parseShopMain(html, url);
+    return data;
 
         function parseShopMain(html: any, url: string): IShopData {
             let $html = $(html);

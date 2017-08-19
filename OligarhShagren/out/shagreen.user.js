@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 // @name          Конкурс Олигархов. Шагрень.
 // @namespace     virtonomica
 // @description   Для конкурса шагрени считает общее число проданной шагрени по каждому участнику
-// @version       1.4
+// @version       1.5
 // @include       https://virtonomic*.**/*/main/olla/*
 // @require       https://code.jquery.com/jquery-1.11.1.min.js
 // ==/UserScript==
@@ -866,7 +866,7 @@ function tryGet(url, retries = 10, timeout = 1000) {
  */
 function tryGet_async(url, retries = 10, timeout = 1000, beforeGet, onError) {
     return __awaiter(this, void 0, void 0, function* () {
-        logDebug(`tryGet_async: ${url}`);
+        //logDebug(`tryGet_async: ${url}`);
         // сам метод пришлось делать Promise<any> потому что string | Error не работало какого то хуя не знаю. Из за стрик нулл чек
         let $deffered = $.Deferred();
         if (beforeGet) {
@@ -1089,7 +1089,7 @@ function buildStoreKey(realm, code, subid) {
     return res;
 }
 /**
- * Возвращает все ключи юнитов для заданного реалма и КОДА.
+ * Возвращает все ключи ЮНИТОВ для заданного реалма и КОДА.
  * @param realm
  * @param storeKey код ключа sh, udd, vh итд
  */
@@ -1105,6 +1105,26 @@ function getStoredUnitsKeys(realm, storeKey) {
         if (key !== buildStoreKey(realm, storeKey, subid))
             continue;
         res.push(key);
+    }
+    return res;
+}
+/**
+ * Возвращает все ключи ЮНИТОВ для заданного реалма и КОДА. А так же subid юнита отдельно
+ * @param realm
+ * @param storeKey код ключа sh, udd, vh итд
+ */
+function getStoredUnitsKeysA(realm, storeKey) {
+    let res = [];
+    for (let key in localStorage) {
+        // если в ключе нет числа, не брать его
+        let m = extractIntPositive(key);
+        if (m == null)
+            continue;
+        // если ключик не совпадает со старым ключем для посетителей
+        let subid = m[0];
+        if (key !== buildStoreKey(realm, storeKey, subid))
+            continue;
+        res.push([key, subid]);
     }
     return res;
 }
@@ -2128,7 +2148,13 @@ function parseUnitMainNew(html, url) {
                 capacity = 1000000;
                 break;
             case 6:
-                capacity = 5000000;
+                capacity = 5 * 1000000;
+                break;
+            case 7:
+                capacity = 50 * 1000000;
+                break;
+            case 8:
+                capacity = 500 * 1000000;
                 break;
             default:
                 throw new Error("неизвестный размер склада " + size);
@@ -2195,7 +2221,7 @@ function parseUnitMainNew(html, url) {
             place: place,
             rent: rent,
             departments: depts,
-            employees: { employees: employees, required: employeesReq, efficiency: employeesEff },
+            employees: { employees: employees, required: employeesReq, efficiency: employeesEff, holidays: inHoliday },
             service: service,
             visitors: visitors
         };
@@ -2221,7 +2247,7 @@ function parseUnitMainNew(html, url) {
         if ($td.length > 0)
             service = serviceFromStrOrError($td.text());
         return {
-            employees: { employees: employees, required: employeesReq, efficiency: employeesEff },
+            employees: { employees: employees, required: employeesReq, efficiency: employeesEff, holidays: inHoliday },
             rent: rent,
             visitors: visitors,
             service: service,
@@ -2421,21 +2447,26 @@ function parseUnitFinRep(html, url) {
 function parseWareResize(html, url) {
     let $html = $(html);
     try {
-        let _size = $html.find(".nowrap:nth-child(2)").map((i, e) => {
-            let txt = $(e).text();
-            let sz = numberfyOrError(txt);
+        let sz = [];
+        let rent = [];
+        let id = [];
+        $html.find(":radio").closest("tr").each((i, el) => {
+            let $r = $(el);
+            let $tds = $r.children("td");
+            let txt = $tds.eq(1).text();
             if (txt.indexOf("тыс") >= 0)
-                sz *= 1000;
-            if (txt.indexOf("млн") >= 0)
-                sz *= 1000000;
-            return sz;
-        }).get();
-        let _rent = $html.find(".nowrap:nth-child(3)").map((i, e) => numberfyOrError($(e).text())).get();
-        let _id = $html.find(":radio").map((i, e) => numberfyOrError($(e).val())).get();
+                sz.push(numberfyOrError(txt) * 1000);
+            else if (txt.indexOf("млн") >= 0)
+                sz.push(numberfyOrError(txt) * 1000000);
+            else if (txt.indexOf("терминал") >= 0)
+                sz.push(500 * 1000000);
+            rent.push(numberfyOrError($tds.eq(2).text()));
+            id.push(numberfyOrError($tds.eq(0).find(":radio").val()));
+        });
         return {
-            capacity: _size,
-            rent: _rent,
-            id: _id
+            capacity: sz,
+            rent: rent,
+            id: id
         };
     }
     catch (err) {
@@ -3893,12 +3924,18 @@ function prepareInfo(storedInfo, toDate) {
             if (dict[pid] == null)
                 dict[pid] = [0, 0, 0];
             let [total, lastSum, sold] = dict[pid];
-            // сколько шагрени продали за день Х. Просто берем выручку за предыдущий период, вычитаем текущую и находим 
-            sold = (player.totalSum - lastSum) / nullCheck(player.shopData).shagreenProp.price;
-            if (sold < 0)
-                throw new Error(`получили отрицательные продажи шагрени для date:${dateKey}, pid: ${pid}, subid: ${player.shopid}`);
-            sold = Math.round(sold);
-            total += sold;
+            // если за этот день нет данных для магазина, например магазина не стало
+            if (player.shopData != null) {
+                // сколько шагрени продали за день Х. Просто берем выручку за предыдущий период, вычитаем текущую и находим 
+                sold = (player.totalSum - lastSum) / player.shopData.shagreenProp.price;
+                if (sold < 0)
+                    throw new Error(`получили отрицательные продажи шагрени для date:${dateKey}, pid: ${pid}, subid: ${player.shopid}`);
+                sold = Math.round(sold);
+                total += sold;
+            }
+            else {
+                sold = 0;
+            }
             dict[pid] = [total, player.totalSum, sold];
         }
         if (dateKey === toDate)
@@ -3926,7 +3963,7 @@ function doUpdate_async(dashDict) {
                 : yield getShopData_async(info.shopid);
             info.shopData = shop;
             // это на будущее, чтобы запросить отчет по шагрени
-            if (cityName == "")
+            if (cityName == "" && shop != null)
                 cityName = shop.cityName;
         }
         log("полный дашборд ", dashDict);
@@ -4022,8 +4059,10 @@ function exportInfo($place) {
             let player = info.players[pid];
             let report = info.retailReport;
             let shop = player.shopData;
-            if (shop == null)
-                throw new Error(`нет данных по магазину для pid:${pid}, date:${dateKey}`);
+            if (shop == null) {
+                log(`нет данных по магазину для pid:${pid}, date:${dateKey}`);
+                continue;
+            }
             // pname, city, datestr, subid. shopname, place, innovations
             let pstr = formatStr("{0};{1};{2};{3};{4};{5};{6};", player.pname, shop.cityName, dateKey, player.shopid, player.shopname, shop.place, shop.innovations.join("|"));
             // celebr, visitors, service, sold index
@@ -4070,7 +4109,17 @@ function getShagreenReport_async(cityName) {
 function getShopData_async(subid) {
     return __awaiter(this, void 0, void 0, function* () {
         let url = `/${Realm}/main/unit/view/${subid}`;
-        let html = yield tryGet_async(url);
+        let html;
+        try {
+            html = yield tryGet_async(url);
+        }
+        catch (err) {
+            log("", err);
+            // если магазин вдруг удалили
+            if (err["status"] = 404)
+                return null;
+            throw err;
+        }
         let data = parseShopMain(html, url);
         return data;
         function parseShopMain(html, url) {
