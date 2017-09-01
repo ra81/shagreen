@@ -213,6 +213,7 @@ async function doUpdate_async(dashDict: IDictionaryN<ITodayDash>) {
     let cityName = "";
     for (let pid in dashDict) {
         let info = dashDict[pid];
+        log(`${info.pname} started.`);
 
         let shop = info.cid === CompanyId
             ? await getMyShopData_async(info.shopid)
@@ -288,7 +289,7 @@ function saveInfo(report: ICityRetailReport, dashDict: IDictionaryN<ITodayDash>)
     // для сегодняшней даты нужно обновить данные и все
     let dateKey = dateToShort(CurrentGameDate);
     storedInfo[dateKey] = { retailReport: report, players: dashDict };
-
+    
     localStorage[storeKey] = JSON.stringify(storedInfo);
     //log("сохранил ", localStorage[storeKey]);
 }
@@ -408,6 +409,10 @@ async function getShopData_async(subid: number): Promise<IShopData|null> {
     let html:any;
     try {
         html = await tryGet_async(url);
+
+        // если чел выставил маг на продажу, значит парсить его не получится. такое бывает
+        if ($(html).find(".headerButtonBuy").length > 0)
+            return null;
     }
     catch (err) {
         log("", err);

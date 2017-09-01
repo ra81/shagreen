@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 // @name          Конкурс Олигархов. Шагрень.
 // @namespace     virtonomica
 // @description   Для конкурса шагрени считает общее число проданной шагрени по каждому участнику
-// @version       1.5
+// @version       1.6
 // @include       https://virtonomic*.**/*/main/olla/*
 // @require       https://code.jquery.com/jquery-1.11.1.min.js
 // ==/UserScript==
@@ -3958,6 +3958,7 @@ function doUpdate_async(dashDict) {
         let cityName = "";
         for (let pid in dashDict) {
             let info = dashDict[pid];
+            log(`${info.pname} started.`);
             let shop = info.cid === CompanyId
                 ? yield getMyShopData_async(info.shopid)
                 : yield getShopData_async(info.shopid);
@@ -4112,6 +4113,9 @@ function getShopData_async(subid) {
         let html;
         try {
             html = yield tryGet_async(url);
+            // если чел выставил маг на продажу, значит парсить его не получится. такое бывает
+            if ($(html).find(".headerButtonBuy").length > 0)
+                return null;
         }
         catch (err) {
             log("", err);
