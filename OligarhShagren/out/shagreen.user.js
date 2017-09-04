@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 // @name          Конкурс Олигархов. Шагрень.
 // @namespace     virtonomica
 // @description   Для конкурса шагрени считает общее число проданной шагрени по каждому участнику
-// @version       1.6
+// @version       1.7
 // @include       https://virtonomic*.**/*/main/olla/*
 // @require       https://code.jquery.com/jquery-1.11.1.min.js
 // ==/UserScript==
@@ -3927,7 +3927,9 @@ function prepareInfo(storedInfo, toDate) {
             // если за этот день нет данных для магазина, например магазина не стало
             if (player.shopData != null) {
                 // сколько шагрени продали за день Х. Просто берем выручку за предыдущий период, вычитаем текущую и находим 
-                sold = (player.totalSum - lastSum) / player.shopData.shagreenProp.price;
+                sold = player.shopData.shagreenProp.price > 0
+                    ? (player.totalSum - lastSum) / player.shopData.shagreenProp.price
+                    : 0;
                 if (sold < 0)
                     throw new Error(`получили отрицательные продажи шагрени для date:${dateKey}, pid: ${pid}, subid: ${player.shopid}`);
                 sold = Math.round(sold);
@@ -4131,7 +4133,7 @@ function getShopData_async(subid) {
             try {
                 // инновации
                 let innov = [];
-                let $slots = $html.find("div.artf_slots");
+                let $slots = $html.find("div.artf_slots"); // может отсутствовать вовсе если нет инноваций
                 if ($slots.length > 0) {
                     $slots.find("img").each((i, el) => {
                         let $img = $(el);
@@ -4145,7 +4147,6 @@ function getShopData_async(subid) {
                 // таблица с данными по товарам
                 let $tbl = oneOrError($html, "table.grid");
                 let $infoBlock = oneOrError($html, "table.infoblock tbody");
-                let $innovBlock = $html.find("div.artf_slots"); // может отсутствовать вовсе если нет инноваций
                 // название города где маг стоит
                 let cityName = oneOrError($infoBlock, "tr:contains('Расположение')").find("td:eq(1)").text().split("(")[0].trim();
                 if (cityName.length === 0)

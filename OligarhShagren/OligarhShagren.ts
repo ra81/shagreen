@@ -175,7 +175,9 @@ function prepareInfo(storedInfo: IDictionary<IStoreItem>, toDate: string): IDict
             // если за этот день нет данных для магазина, например магазина не стало
             if (player.shopData != null) {
                 // сколько шагрени продали за день Х. Просто берем выручку за предыдущий период, вычитаем текущую и находим 
-                sold = (player.totalSum - lastSum) / player.shopData.shagreenProp.price;
+                sold = player.shopData.shagreenProp.price > 0
+                    ? (player.totalSum - lastSum) / player.shopData.shagreenProp.price
+                    : 0;
                 if (sold < 0)
                     throw new Error(`получили отрицательные продажи шагрени для date:${dateKey}, pid: ${pid}, subid: ${player.shopid}`);
 
@@ -434,7 +436,7 @@ async function getShopData_async(subid: number): Promise<IShopData|null> {
 
                 // инновации
                 let innov: string[] = [];
-                let $slots = $html.find("div.artf_slots");
+                let $slots = $html.find("div.artf_slots"); // может отсутствовать вовсе если нет инноваций
                 if ($slots.length > 0) {
                     $slots.find("img").each((i, el) => {
                         let $img = $(el);
@@ -452,7 +454,6 @@ async function getShopData_async(subid: number): Promise<IShopData|null> {
                 // таблица с данными по товарам
                 let $tbl = oneOrError($html, "table.grid");
                 let $infoBlock = oneOrError($html, "table.infoblock tbody");
-                let $innovBlock = $html.find("div.artf_slots");     // может отсутствовать вовсе если нет инноваций
 
                 // название города где маг стоит
                 let cityName = oneOrError($infoBlock, "tr:contains('Расположение')").find("td:eq(1)").text().split("(")[0].trim();
