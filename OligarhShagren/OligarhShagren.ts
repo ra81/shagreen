@@ -120,11 +120,11 @@ async function run_async() {
 
         // теперь в каждую строку выводим инфу о проданном сегодня и вообще
         for (let pid in prepared) {
-            let [sold, total] = prepared[pid];
+            let [sold, total, avgPrice] = prepared[pid];
 
             let url = `/${Realm}/main/user/view/${pid}`;
             let $r = oneOrError($tbl, `a[href*='${url}']`).closest("tr");
-            $r.children("td").eq(3).append(`<div style="color:red">sold:${sold}, total:${total}</div>`);
+            $r.children("td").eq(3).append(`<div style="color:red">sold:${sold}, avg:${avgPrice.toFixed(2)}, total:${total}</div>`);
         }
     }    
 }
@@ -135,7 +135,7 @@ async function run_async() {
  * для каждого игрока в хранилище готовит данные вида pid = [sold, totalsold] на сегодняшнюю дату
  * @param storedInfo
  */
-function prepareInfo(storedInfo: IDictionary<IStoreItem>, toDate: string): IDictionaryN<[number, number]> | null {
+function prepareInfo(storedInfo: IDictionary<IStoreItem>, toDate: string): IDictionaryN<[number, number, number]> | null {
 
     // если данных на сегодня нет, то как бы возвращаем нулл
     //let todayKey = dateToShort(CurrentGameDate);
@@ -196,11 +196,11 @@ function prepareInfo(storedInfo: IDictionary<IStoreItem>, toDate: string): IDict
             break;
     }
 
-    // подготовим результат. нужно для pid = продано сегодня, всего
-    let resDict: IDictionaryN<[number, number]> = {};
+    // подготовим результат. нужно для pid = продано сегодня, всего, средняя цена
+    let resDict: IDictionaryN<[number, number, number]> = {};
     for (let pid in dict) {
         let [total, lastSum, sold] = dict[pid];
-        resDict[pid] = [sold, total];
+        resDict[pid] = [sold, total, lastSum / total];
     }
 
     return resDict;

@@ -10,7 +10,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 // @name          Конкурс Олигархов. Шагрень.
 // @namespace     virtonomica
 // @description   Для конкурса шагрени считает общее число проданной шагрени по каждому участнику
-// @version       1.7
+// @version       1.8
 // @include       https://virtonomic*.**/*/main/olla/*
 // @require       https://code.jquery.com/jquery-1.11.1.min.js
 // ==/UserScript==
@@ -3886,10 +3886,10 @@ function run_async() {
                 return;
             // теперь в каждую строку выводим инфу о проданном сегодня и вообще
             for (let pid in prepared) {
-                let [sold, total] = prepared[pid];
+                let [sold, total, avgPrice] = prepared[pid];
                 let url = `/${Realm}/main/user/view/${pid}`;
                 let $r = oneOrError($tbl, `a[href*='${url}']`).closest("tr");
-                $r.children("td").eq(3).append(`<div style="color:red">sold:${sold}, total:${total}</div>`);
+                $r.children("td").eq(3).append(`<div style="color:red">sold:${sold}, avg:${avgPrice.toFixed(2)}, total:${total}</div>`);
             }
         }
     });
@@ -3943,11 +3943,11 @@ function prepareInfo(storedInfo, toDate) {
         if (dateKey === toDate)
             break;
     }
-    // подготовим результат. нужно для pid = продано сегодня, всего
+    // подготовим результат. нужно для pid = продано сегодня, всего, средняя цена
     let resDict = {};
     for (let pid in dict) {
         let [total, lastSum, sold] = dict[pid];
-        resDict[pid] = [sold, total];
+        resDict[pid] = [sold, total, lastSum / total];
     }
     return resDict;
 }
