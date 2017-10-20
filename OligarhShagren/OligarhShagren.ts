@@ -7,8 +7,8 @@
 $ = jQuery = jQuery.noConflict(true);
 $xioDebug = true;
 let Realm = getRealmOrError();
-let CompanyId = getCompanyId();
-let CurrentGameDate = parseGameDate(document, document.location.pathname);
+let CompanyId = nullCheck(parseCompanyId(document));
+let CurrentGameDate = nullCheck(parseGameDate(document));
 let StoreKeyCode = "olsh";
 let OllaID: number | null;
 
@@ -515,41 +515,41 @@ async function getMyShopData_async(subid: number): Promise<IShopData> {
     let shop = main as any as IMainShop;
 
     // собираем инновации
-    let innov: string[] = [];
-    let $slots = $(mainHtml).find("div.artf_slots");
-    if ($slots.length > 0) {
-        $slots.find("img[title*='/']").each((i, el) => {
-            let $img = $(el);
+    let innov: string[] = main.innovations;
+    //let $slots = $(mainHtml).find("div.artf_slots");
+    //if ($slots.length > 0) {
+    //    $slots.find("img[title*='/']").each((i, el) => {
+    //        let $img = $(el);
 
-            // обычно выглядит так: Маркетинг / Автомобильная парковка
-            let title = $img.attr("title");
-            let items = title.split("/");
-            let name = nullCheck(items[items.length - 1]).trim();
+    //        // обычно выглядит так: Маркетинг / Автомобильная парковка
+    //        let title = $img.attr("title");
+    //        let items = title.split("/");
+    //        let name = nullCheck(items[items.length - 1]).trim();
 
-            innov.push(name);
-        });
-    }
+    //        innov.push(name);
+    //    });
+    //}
 
     // трейдхолл
-    url = `/${Realm}/main/unit/view/${subid}/trading_hall`;
+    url = `/${Realm}/window/unit/view/${subid}/trading_hall`;
     let hallHtml = await tryGet_async(url);
-    let [filling, hall] = parseTradeHall(hallHtml, url);
+    let [filling, hall] = parseUnitTradeHall(hallHtml, url);
     let thItem = hall.find(v => v.product.img.indexOf("shagreen.gif") >= 0);
     if (thItem == null)
         throw new Error("не нашел шагрени в своем магазине");
 
     // запросим отчет по продажам и найдем нужную дату
     let repHtml = await tryGet_async(thItem.historyUrl);
-    let hist = parseRetailPriceHistory(repHtml, thItem.historyUrl);
+    let hist = parseUnitRetailPriceHistory(repHtml, thItem.historyUrl);
     let datestr = dateToShort(CurrentGameDate);
     let hitem = hist.find(v => dateToShort(v.date) === datestr);
     let prop: IProductProperties = hitem == null
         ? { price: 0, brand: 0, quality: 0 }
         : { price: hitem.price, brand: hitem.brand, quality: hitem.quality };
 
-    url = `/${Realm}/main/unit/view/${subid}/virtasement`;
+    url = `/${Realm}/window/unit/view/${subid}/virtasement`;
     let adsHtml = await tryGet_async(url);
-    let ads = parseAds(adsHtml, url);
+    let ads = parseUnitAds(adsHtml, url);
 
     return {
         innovations: innov,
@@ -578,14 +578,15 @@ async function getShops_async(): Promise<IDictionaryN<IUnit>> {
     await tryGet_async(`/${Realm}/main/common/util/setpaging/dbunit/unitListWithProduction/20000`);
 
     // забрали страничку с юнитами
-    let html = await tryGet_async(`/${Realm}/main/company/view/${CompanyId}/unit_list`);
+    let url = `/${Realm}/window/company/view/${CompanyId}/unit_list`;
+    let html = await tryGet_async(url);
 
     // вернем пагинацию, и вернем назад установки фильтрации
     await tryGet_async(`/${Realm}/main/common/util/setpaging/dbunit/unitListWithProduction/400`);
     await tryGet_async($(".u-s").attr("href") || `/${Realm}/main/common/util/setfiltering/dbunit/unitListWithProduction/class=0/size=0/type=${$(".unittype").val()}`);
 
     // обработаем страничку и вернем результат
-    let shops = parseUnitList(html, document.location.pathname);
+    let shops = parseUnitList(html, url);
     if (Object.keys(shops).length < 2)
         throw new Error("список магазинов не пришел");
 
@@ -597,9 +598,9 @@ async function getShops_async(): Promise<IDictionaryN<IUnit>> {
  */
 async function getGeos_async(): Promise<IDictionary<[ICountry, IRegion, ICity]>> {
 
-    let countries_tpl = `/${Realm}/main/common/main_page/game_info/bonuses/country`;
-    let regions_tpl = `/${Realm}/main/common/main_page/game_info/bonuses/region`;
-    let cities_tpl = `/${Realm}/main/common/main_page/game_info/bonuses/city`;
+    let countries_tpl = `/${Realm}/window/common/main_page/game_info/bonuses/country`;
+    let regions_tpl = `/${Realm}/window/common/main_page/game_info/bonuses/region`;
+    let cities_tpl = `/${Realm}/window/common/main_page/game_info/bonuses/city`;
 
     try {
         // сначала собираем данные по городам регионам отдельно
@@ -661,7 +662,7 @@ async function getGeos_async(): Promise<IDictionary<[ICountry, IRegion, ICity]>>
  */
 async function getShagreenId_async(): Promise<number> {
     try {
-        let url = `/${Realm}/main/common/main_page/game_info/products`;
+        let url = `/${Realm}/window/common/main_page/game_info/products`;
         let html = await tryGet_async(url);
 
         // /olga/main/product/info/423040
@@ -678,13 +679,5 @@ async function getShagreenId_async(): Promise<number> {
     }
 }
 
-
-function nullCheck<T>(val: T | null) {
-
-    if (val == null)
-        throw new Error(`nullCheck Error`);
-
-    return val;
-}
 
 $(document).ready(() => run_async());
